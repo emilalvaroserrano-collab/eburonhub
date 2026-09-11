@@ -1,9 +1,8 @@
 import 'dart:async';
 
+import 'package:eburon_hub/src/models.dart';
+import 'package:eburon_hub/src/runtime.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import '../lib/src/models.dart';
-import '../lib/src/runtime.dart';
 
 void main() {
   test('ModelDescriptor round-trips runtime and format independently', () {
