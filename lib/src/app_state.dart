@@ -13,18 +13,22 @@ final settingsServiceProvider = Provider((ref) => SettingsService());
 final modelStoreProvider = Provider((ref) => ModelStore());
 final modelImporterProvider = Provider((ref) => ModelImporter());
 final runtimeManagerProvider = Provider((ref) => RuntimeManager());
+
 final inferenceSchedulerProvider = Provider((ref) {
   final scheduler = InferenceScheduler();
-  ref.onDispose(scheduler.dispose);
+  ref.onDispose(() => unawaited(scheduler.dispose()));
   return scheduler;
 });
+
 final resourceManagerProvider = Provider((ref) => RuntimeResourceManager());
 
-final settingsProvider = StateNotifierProvider<SettingsNotifier, AppSettings>((ref) {
+final settingsProvider =
+    StateNotifierProvider<SettingsNotifier, AppSettings>((ref) {
   return SettingsNotifier(ref.read(settingsServiceProvider));
 });
 
-final modelsProvider = StateNotifierProvider<ModelsNotifier, List<ModelDescriptor>>((ref) {
+final modelsProvider =
+    StateNotifierProvider<ModelsNotifier, List<ModelDescriptor>>((ref) {
   return ModelsNotifier(
     store: ref.read(modelStoreProvider),
     importer: ref.read(modelImporterProvider),
@@ -37,17 +41,16 @@ final localApiServerProvider = Provider<LocalApiServer>((ref) {
     models: () => ref.read(modelsProvider),
     runtimeHealth: ref.read(runtimeManagerProvider).health,
   );
-  ref.onDispose(server.dispose);
+  ref.onDispose(() => unawaited(server.dispose()));
   return server;
 });
 
-final serverStateProvider = StateNotifierProvider<ServerNotifier, ServerState>((ref) {
-  final notifier = ServerNotifier(
+final serverStateProvider =
+    StateNotifierProvider<ServerNotifier, ServerState>((ref) {
+  return ServerNotifier(
     server: ref.read(localApiServerProvider),
     readSettings: () => ref.read(settingsProvider),
   );
-  ref.onDispose(notifier.dispose);
-  return notifier;
 });
 
 final runtimeHealthProvider = FutureProvider<List<RuntimeHealth>>((ref) {
@@ -59,8 +62,7 @@ final appBootstrapProvider = FutureProvider<void>((ref) async {
     ref.read(settingsProvider.notifier).load(),
     ref.read(modelsProvider.notifier).load(),
   ]);
-  final settings = ref.read(settingsProvider);
-  if (settings.autoStartServer) {
+  if (ref.read(settingsProvider).autoStartServer) {
     await ref.read(serverStateProvider.notifier).start();
   }
 });
@@ -70,27 +72,22 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
 
   final SettingsService _service;
 
-  Future<void> load() async {
-    state = await _service.load();
-  }
+  Future<void> load() async => state = await _service.load();
 
   Future<void> update(AppSettings next) async {
     state = next;
     await _service.save(next);
   }
 
-  Future<void> setTheme(String themeMode) =>
-      update(state.copyWith(themeMode: themeMode));
-
-  Future<void> setServerPort(int port) => update(state.copyWith(serverPort: port));
-
+  Future<void> setTheme(String value) =>
+      update(state.copyWith(themeMode: value));
+  Future<void> setServerPort(int value) =>
+      update(state.copyWith(serverPort: value));
   Future<void> setRequireApiKey(bool value) =>
       update(state.copyWith(requireApiKey: value));
-
-  Future<void> setLanAccess(bool value) => update(state.copyWith(lanAccess: value));
-
+  Future<void> setLanAccess(bool value) =>
+      update(state.copyWith(lanAccess: value));
   Future<void> setCors(bool value) => update(state.copyWith(cors: value));
-
   Future<void> setAutoStart(bool value) =>
       update(state.copyWith(autoStartServer: value));
 
@@ -115,9 +112,7 @@ class ModelsNotifier extends StateNotifier<List<ModelDescriptor>> {
   final ModelImporter _importer;
   final RuntimeManager _runtimeManager;
 
-  Future<void> load() async {
-    state = await _store.load();
-  }
+  Future<void> load() async => state = await _store.load();
 
   Future<ModelDescriptor?> import({ModelType? type}) async {
     final descriptor = await _importer.pickAndImport(expectedType: type);
@@ -138,7 +133,7 @@ class ModelsNotifier extends StateNotifier<List<ModelDescriptor>> {
   }
 
   Future<void> setDefault(String id) async {
-    final target = state.where((m) => m.id == id).firstOrNull;
+    final target = state.where((model) => model.id == id).firstOrNull;
     if (target == null) return;
     state = [
       for (final model in state)
@@ -153,30 +148,27 @@ class ModelsNotifier extends StateNotifier<List<ModelDescriptor>> {
   Future<void> toggleLoaded(String id) async {
     final index = state.indexWhere((model) => model.id == id);
     if (index < 0) return;
-    final model = state[index];
     if (!_runtimeManager.bridge.available) {
       throw StateError(
-        'Native runtime bridge is not linked. Build native/libeburon_runtime for this platform first.',
+        'Native runtime bridge is not linked. Build libeburon_runtime for this platform first.',
       );
     }
 
-    // The app-level lifecycle is implemented here. Concrete native model load/unload
-    // is delegated to the runtime adapter behind libeburon_runtime.
-    final updated = model.copyWith(loaded: !model.loaded);
     final next = [...state];
-    next[index] = updated;
+    next[index] = next[index].copyWith(loaded: !next[index].loaded);
     state = next;
     await _persist();
   }
 
   Future<void> delete(String id) async {
-    final model = state.where((m) => m.id == id).firstOrNull;
+    final model = state.where((item) => item.id == id).firstOrNull;
     if (model == null) return;
-    final entity = FileSystemEntity.typeSync(model.path);
-    if (entity == FileSystemEntityType.directory) {
-      final dir = Directory(model.path);
-      if (await dir.exists()) await dir.delete(recursive: true);
-    } else if (entity == FileSystemEntityType.file) {
+
+    final type = FileSystemEntity.typeSync(model.path);
+    if (type == FileSystemEntityType.directory) {
+      final directory = Directory(model.path);
+      if (await directory.exists()) await directory.delete(recursive: true);
+    } else if (type == FileSystemEntityType.file) {
       final file = File(model.path);
       if (await file.exists()) {
         final parent = file.parent;
@@ -184,7 +176,8 @@ class ModelsNotifier extends StateNotifier<List<ModelDescriptor>> {
         if (await parent.exists()) await parent.delete(recursive: true);
       }
     }
-    state = state.where((m) => m.id != id).toList(growable: false);
+
+    state = state.where((item) => item.id != id).toList(growable: false);
     await _persist();
   }
 
@@ -256,7 +249,11 @@ class ServerNotifier extends StateNotifier<ServerState> {
   Future<void> stop() async {
     await _server.stop();
     _active.clear();
-    state = state.copyWith(running: false, activeRequests: 0, clearError: true);
+    state = state.copyWith(
+      running: false,
+      activeRequests: 0,
+      clearError: true,
+    );
   }
 
   Future<void> restart() async {
@@ -279,20 +276,24 @@ class ServerNotifier extends StateNotifier<ServerState> {
     } else {
       _active.remove(activity.requestId);
     }
+    if (!mounted) return;
     state = state.copyWith(
       activeRequests: _active.length,
       lastRequest: '${activity.method} ${activity.path}',
     );
   }
 
-  Future<void> dispose() async {
-    await _activitySub?.cancel();
+  @override
+  void dispose() {
+    unawaited(_activitySub?.cancel());
+    _activitySub = null;
+    super.dispose();
   }
 }
 
 extension _FirstOrNull<T> on Iterable<T> {
   T? get firstOrNull {
-    final iterator = this.iterator;
-    return iterator.moveNext() ? iterator.current : null;
+    final it = iterator;
+    return it.moveNext() ? it.current : null;
   }
 }
