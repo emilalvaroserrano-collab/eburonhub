@@ -54,10 +54,10 @@ class LocalApiServer {
   Future<void> start(AppSettings settings) async {
     if (running) return;
     _settings = settings;
-    final bindAddress = settings.lanAccess
+    final address = settings.lanAccess
         ? InternetAddress.anyIPv4
         : InternetAddress.loopbackIPv4;
-    _server = await HttpServer.bind(bindAddress, settings.serverPort);
+    _server = await HttpServer.bind(address, settings.serverPort);
     unawaited(_serve(_server!));
   }
 
@@ -91,43 +91,26 @@ class LocalApiServer {
         return;
       }
       if (!_authorized(request)) {
-        await _json(request.response, HttpStatus.unauthorized, {
-          'error': {
-            'message': 'Invalid or missing API key',
-            'type': 'authentication_error',
-          }
-        });
+        await _json(request.response, HttpStatus.unauthorized, _error(
+          'Invalid or missing API key',
+          'authentication_error',
+        ));
         return;
       }
       if (!_allowRequest(request)) {
-        await _json(request.response, HttpStatus.tooManyRequests, {
-          'error': {
-            'message': 'Rate limit exceeded',
-            'type': 'rate_limit_error',
-          }
-        });
+        await _json(request.response, HttpStatus.tooManyRequests, _error(
+          'Rate limit exceeded',
+          'rate_limit_error',
+        ));
         return;
       }
 
       final path = request.uri.path;
       if (request.method == 'GET' && path == '/health') {
-        final health = await _runtimeHealth();
-        await _json(request.response, HttpStatus.ok, {
-          'status': 'ok',
-          'server': 'eburon-hub',
-          'runtime': health
-              .map((e) => {
-                    'name': e.runtime.wireName,
-                    'available': e.available,
-                    'version': e.version,
-                    'message': e.message,
-                  })
-              .toList(),
-        });
+        await _health(request.response);
       } else if (request.method == 'GET' && path == '/v1/models') {
         await _modelsEndpoint(request.response);
-      } else if (request.method == 'GET' &&
-          path == '/v1/server/capabilities') {
+      } else if (request.method == 'GET' && path == '/v1/server/capabilities') {
         await _capabilitiesEndpoint(request.response);
       } else if (request.method == 'POST' &&
           (path == '/v1/chat/completions' || path == '/v1/completions')) {
@@ -143,23 +126,21 @@ class LocalApiServer {
           path == '/v1/realtime/speech') {
         await _realtimeSocket(request);
       } else {
-        await _json(request.response, HttpStatus.notFound, {
-          'error': {
-            'message': 'Route not found: ${request.method} $path',
-            'type': 'invalid_request_error',
-          }
-        });
+        await _json(request.response, HttpStatus.notFound, _error(
+          'Route not found: ${request.method} $path',
+          'invalid_request_error',
+        ));
       }
     } catch (error) {
-      if (!request.response.headersSent) {
-        await _json(request.response, HttpStatus.internalServerError, {
-          'error': {
-            'message': error.toString(),
-            'type': 'server_error',
-          }
-        });
-      } else {
-        await request.response.close();
+      try {
+        await _json(request.response, HttpStatus.internalServerError, _error(
+          error.toString(),
+          'server_error',
+        ));
+      } catch (_) {
+        try {
+          await request.response.close();
+        } catch (_) {}
       }
     } finally {
       _activity.add(ServerActivity(
@@ -172,6 +153,10 @@ class LocalApiServer {
     }
   }
 
+  Map<String, Object> _error(String message, String type) => {
+        'error': {'message': message, 'type': type},
+      };
+
   bool _authorized(HttpRequest request) {
     if (!_settings.requireApiKey) return true;
     final expected = _settings.apiKey.trim();
@@ -183,13 +168,13 @@ class LocalApiServer {
   bool _allowRequest(HttpRequest request) {
     final key = request.connectionInfo?.remoteAddress.address ?? 'unknown';
     final now = DateTime.now();
-    final current = _rateBuckets[key];
-    if (current == null || now.difference(current.started) >= const Duration(minutes: 1)) {
+    final bucket = _rateBuckets[key];
+    if (bucket == null || now.difference(bucket.started) >= const Duration(minutes: 1)) {
       _rateBuckets[key] = _RateBucket(now, 1);
       return true;
     }
-    if (current.count >= 120) return false;
-    current.count++;
+    if (bucket.count >= 120) return false;
+    bucket.count++;
     return true;
   }
 
@@ -201,39 +186,57 @@ class LocalApiServer {
       ..set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   }
 
+  Future<void> _health(HttpResponse response) async {
+    final health = await _runtimeHealth();
+    await _json(response, HttpStatus.ok, {
+      'status': 'ok',
+      'server': 'eburon-hub',
+      'runtime': health
+          .map((e) => {
+                'name': e.runtime.wireName,
+                'available': e.available,
+                'version': e.version,
+                'message': e.message,
+              })
+          .toList(growable: false),
+    });
+  }
+
   Future<void> _modelsEndpoint(HttpResponse response) async {
-    final data = _models()
-        .map((model) => {
-              'id': model.id,
-              'object': 'model',
-              'owned_by': 'local',
-              'name': model.name,
-              'type': model.type.wireName,
-              'runtime': model.runtime.wireName,
-              'format': model.format.wireName,
-              'loaded': model.loaded,
-              'default': model.isDefault,
-            })
-        .toList();
-    await _json(response, HttpStatus.ok, {'object': 'list', 'data': data});
+    await _json(response, HttpStatus.ok, {
+      'object': 'list',
+      'data': _models()
+          .map((model) => {
+                'id': model.id,
+                'object': 'model',
+                'owned_by': 'local',
+                'name': model.name,
+                'type': model.type.wireName,
+                'runtime': model.runtime.wireName,
+                'format': model.format.wireName,
+                'loaded': model.loaded,
+                'default': model.isDefault,
+              })
+          .toList(growable: false),
+    });
   }
 
   Future<void> _capabilitiesEndpoint(HttpResponse response) async {
     final models = _models();
-    bool available(ModelType type) => models.any((m) => m.type == type && m.loaded);
+    bool loaded(ModelType type) => models.any((m) => m.type == type && m.loaded);
     await _json(response, HttpStatus.ok, {
       'server': 'eburon-hub',
       'protocols': ['http', 'sse', 'websocket'],
       'openai_compatible': true,
       'capabilities': {
-        'chat': available(ModelType.llm),
-        'completions': available(ModelType.llm),
-        'transcriptions': available(ModelType.stt),
-        'speech': available(ModelType.tts),
-        'images': available(ModelType.image),
-        'realtime_transcription': available(ModelType.stt),
-        'realtime_speech': available(ModelType.tts),
-      }
+        'chat': loaded(ModelType.llm),
+        'completions': loaded(ModelType.llm),
+        'transcriptions': loaded(ModelType.stt),
+        'speech': loaded(ModelType.tts),
+        'images': loaded(ModelType.image),
+        'realtime_transcription': loaded(ModelType.stt),
+        'realtime_speech': loaded(ModelType.tts),
+      },
     });
   }
 
@@ -241,11 +244,11 @@ class LocalApiServer {
     HttpRequest request, {
     required bool legacyCompletion,
   }) async {
-    final body = await utf8.decoder.bind(request).join();
-    final payload = jsonDecode(body) as Map<String, dynamic>;
-    final stream = payload['stream'] as bool? ?? false;
+    final payload = jsonDecode(await utf8.decoder.bind(request).join())
+        as Map<String, dynamic>;
+    final wantsStream = payload['stream'] as bool? ?? false;
     final modelId = payload['model']?.toString() ?? 'local-model';
-    final messages = <Map<String, String>>[];
+    final history = <Map<String, String>>[];
     String prompt = '';
     String? systemPrompt;
 
@@ -259,7 +262,7 @@ class LocalApiServer {
         if (role == 'system') {
           systemPrompt = content;
         } else {
-          messages.add({'role': role, 'content': content});
+          history.add({'role': role, 'content': content});
           if (role == 'user') prompt = content;
         }
       }
@@ -273,77 +276,87 @@ class LocalApiServer {
 
     final cancellation = CancellationToken();
     unawaited(request.response.done.whenComplete(cancellation.cancel));
-    final tokenStream = chat(prompt, systemPrompt, messages, cancellation);
+    final tokens = chat(prompt, systemPrompt, history, cancellation);
     final id = 'chatcmpl-local-${DateTime.now().microsecondsSinceEpoch}';
     final created = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    if (stream) {
+    if (wantsStream) {
       request.response.statusCode = HttpStatus.ok;
       request.response.headers
         ..contentType = ContentType('text', 'event-stream', charset: 'utf-8')
         ..set(HttpHeaders.cacheControlHeader, 'no-cache')
         ..set(HttpHeaders.connectionHeader, 'keep-alive');
-      await for (final token in tokenStream) {
-        if (cancellation.isCancelled) break;
-        final event = {
-          'id': id,
-          'object': 'chat.completion.chunk',
-          'created': created,
-          'model': modelId,
-          'choices': [
-            {
-              'index': 0,
-              'delta': {'content': token},
-              'finish_reason': null,
-            }
-          ],
-        };
-        request.response.write('data: ${jsonEncode(event)}\n\n');
-        await request.response.flush();
+      try {
+        await for (final token in tokens) {
+          if (cancellation.isCancelled) break;
+          final event = {
+            'id': id,
+            'object': 'chat.completion.chunk',
+            'created': created,
+            'model': modelId,
+            'choices': [
+              {
+                'index': 0,
+                'delta': {'content': token},
+                'finish_reason': null,
+              }
+            ],
+          };
+          request.response.write('data: ${jsonEncode(event)}\n\n');
+          await request.response.flush();
+        }
+        if (!cancellation.isCancelled) {
+          request.response.write('data: [DONE]\n\n');
+          await request.response.flush();
+        }
+      } finally {
+        await request.response.close();
+        await cancellation.dispose();
       }
-      request.response.write('data: [DONE]\n\n');
-      await request.response.flush();
-      await request.response.close();
-      await cancellation.dispose();
       return;
     }
 
     final buffer = StringBuffer();
-    await for (final token in tokenStream) {
-      buffer.write(token);
+    try {
+      await for (final token in tokens) {
+        cancellation.throwIfCancelled();
+        buffer.write(token);
+      }
+      await _json(request.response, HttpStatus.ok, {
+        'id': id,
+        'object': legacyCompletion ? 'text_completion' : 'chat.completion',
+        'created': created,
+        'model': modelId,
+        'choices': [
+          legacyCompletion
+              ? {
+                  'index': 0,
+                  'text': buffer.toString(),
+                  'finish_reason': 'stop',
+                }
+              : {
+                  'index': 0,
+                  'message': {'role': 'assistant', 'content': buffer.toString()},
+                  'finish_reason': 'stop',
+                }
+        ],
+        'usage': {
+          'prompt_tokens': 0,
+          'completion_tokens': 0,
+          'total_tokens': 0,
+        },
+      });
+    } finally {
+      await cancellation.dispose();
     }
-    await _json(request.response, HttpStatus.ok, {
-      'id': id,
-      'object': legacyCompletion ? 'text_completion' : 'chat.completion',
-      'created': created,
-      'model': modelId,
-      'choices': [
-        legacyCompletion
-            ? {
-                'index': 0,
-                'text': buffer.toString(),
-                'finish_reason': 'stop',
-              }
-            : {
-                'index': 0,
-                'message': {'role': 'assistant', 'content': buffer.toString()},
-                'finish_reason': 'stop',
-              }
-      ],
-      'usage': {
-        'prompt_tokens': 0,
-        'completion_tokens': 0,
-        'total_tokens': 0,
-      },
-    });
-    await cancellation.dispose();
   }
 
   Future<void> _realtimeSocket(HttpRequest request) async {
     if (!WebSocketTransformer.isUpgradeRequest(request)) {
-      await _json(request.response, HttpStatus.badRequest, {
-        'error': {'message': 'WebSocket upgrade required'}
-      });
+      await _json(request.response, HttpStatus.badRequest, _error(
+        'WebSocket upgrade required',
+        'invalid_request_error',
+      ));
       return;
     }
     final socket = await WebSocketTransformer.upgrade(request);
@@ -351,25 +364,19 @@ class LocalApiServer {
       'type': 'error',
       'error': {
         'code': 'runtime_not_loaded',
-        'message': 'Realtime native stream adapter is not linked yet.'
-      }
+        'message': 'Realtime native stream adapter is not linked yet.',
+      },
     }));
     await socket.close();
   }
 
   Future<void> _notReady(HttpResponse response, String component) =>
-      _json(response, HttpStatus.serviceUnavailable, {
-        'error': {
-          'message': '$component is not available',
-          'type': 'runtime_unavailable',
-        }
-      });
+      _json(response, HttpStatus.serviceUnavailable, _error(
+        '$component is not available',
+        'runtime_unavailable',
+      ));
 
-  Future<void> _json(
-    HttpResponse response,
-    int status,
-    Object value,
-  ) async {
+  Future<void> _json(HttpResponse response, int status, Object value) async {
     response.statusCode = status;
     response.headers.contentType = ContentType.json;
     response.write(jsonEncode(value));
