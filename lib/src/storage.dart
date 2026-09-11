@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -98,40 +98,37 @@ class AppSettings {
     double? imageCfg,
     String? imageSampler,
     String? imageScheduler,
-  }) {
-    return AppSettings(
-      themeMode: themeMode ?? this.themeMode,
-      serverPort: serverPort ?? this.serverPort,
-      requireApiKey: requireApiKey ?? this.requireApiKey,
-      apiKey: apiKey ?? this.apiKey,
-      autoStartServer: autoStartServer ?? this.autoStartServer,
-      lanAccess: lanAccess ?? this.lanAccess,
-      cors: cors ?? this.cors,
-      llmContextSize: llmContextSize ?? this.llmContextSize,
-      llmThreads: llmThreads ?? this.llmThreads,
-      llmGpuLayers: llmGpuLayers ?? this.llmGpuLayers,
-      llmMaxTokens: llmMaxTokens ?? this.llmMaxTokens,
-      llmTemperature: llmTemperature ?? this.llmTemperature,
-      systemPrompt: systemPrompt ?? this.systemPrompt,
-      sttLanguage: sttLanguage ?? this.sttLanguage,
-      sttVad: sttVad ?? this.sttVad,
-      sttSilenceTimeoutMs: sttSilenceTimeoutMs ?? this.sttSilenceTimeoutMs,
-      sttConfidenceThreshold:
-          sttConfidenceThreshold ?? this.sttConfidenceThreshold,
-      ttsVoice: ttsVoice ?? this.ttsVoice,
-      ttsSpeed: ttsSpeed ?? this.ttsSpeed,
-      ttsAudioFormat: ttsAudioFormat ?? this.ttsAudioFormat,
-      ttsStreamingBufferMs:
-          ttsStreamingBufferMs ?? this.ttsStreamingBufferMs,
-      ttsSentenceChunking:
-          ttsSentenceChunking ?? this.ttsSentenceChunking,
-      imageSize: imageSize ?? this.imageSize,
-      imageSteps: imageSteps ?? this.imageSteps,
-      imageCfg: imageCfg ?? this.imageCfg,
-      imageSampler: imageSampler ?? this.imageSampler,
-      imageScheduler: imageScheduler ?? this.imageScheduler,
-    );
-  }
+  }) => AppSettings(
+        themeMode: themeMode ?? this.themeMode,
+        serverPort: serverPort ?? this.serverPort,
+        requireApiKey: requireApiKey ?? this.requireApiKey,
+        apiKey: apiKey ?? this.apiKey,
+        autoStartServer: autoStartServer ?? this.autoStartServer,
+        lanAccess: lanAccess ?? this.lanAccess,
+        cors: cors ?? this.cors,
+        llmContextSize: llmContextSize ?? this.llmContextSize,
+        llmThreads: llmThreads ?? this.llmThreads,
+        llmGpuLayers: llmGpuLayers ?? this.llmGpuLayers,
+        llmMaxTokens: llmMaxTokens ?? this.llmMaxTokens,
+        llmTemperature: llmTemperature ?? this.llmTemperature,
+        systemPrompt: systemPrompt ?? this.systemPrompt,
+        sttLanguage: sttLanguage ?? this.sttLanguage,
+        sttVad: sttVad ?? this.sttVad,
+        sttSilenceTimeoutMs: sttSilenceTimeoutMs ?? this.sttSilenceTimeoutMs,
+        sttConfidenceThreshold:
+            sttConfidenceThreshold ?? this.sttConfidenceThreshold,
+        ttsVoice: ttsVoice ?? this.ttsVoice,
+        ttsSpeed: ttsSpeed ?? this.ttsSpeed,
+        ttsAudioFormat: ttsAudioFormat ?? this.ttsAudioFormat,
+        ttsStreamingBufferMs:
+            ttsStreamingBufferMs ?? this.ttsStreamingBufferMs,
+        ttsSentenceChunking: ttsSentenceChunking ?? this.ttsSentenceChunking,
+        imageSize: imageSize ?? this.imageSize,
+        imageSteps: imageSteps ?? this.imageSteps,
+        imageCfg: imageCfg ?? this.imageCfg,
+        imageSampler: imageSampler ?? this.imageSampler,
+        imageScheduler: imageScheduler ?? this.imageScheduler,
+      );
 
   Map<String, Object?> toJson() => {
         'themeMode': themeMode,
@@ -163,51 +160,42 @@ class AppSettings {
         'imageScheduler': imageScheduler,
       };
 
-  factory AppSettings.fromJson(Map<String, dynamic> json) {
-    final defaults = const AppSettings();
+  factory AppSettings.fromJson(Map<String, dynamic> j) {
+    const d = AppSettings();
     return AppSettings(
-      themeMode: json['themeMode'] as String? ?? defaults.themeMode,
-      serverPort: (json['serverPort'] as num?)?.toInt() ?? defaults.serverPort,
-      requireApiKey: json['requireApiKey'] as bool? ?? defaults.requireApiKey,
-      apiKey: json['apiKey'] as String? ?? defaults.apiKey,
-      autoStartServer:
-          json['autoStartServer'] as bool? ?? defaults.autoStartServer,
-      lanAccess: json['lanAccess'] as bool? ?? defaults.lanAccess,
-      cors: json['cors'] as bool? ?? defaults.cors,
-      llmContextSize:
-          (json['llmContextSize'] as num?)?.toInt() ?? defaults.llmContextSize,
-      llmThreads:
-          (json['llmThreads'] as num?)?.toInt() ?? defaults.llmThreads,
-      llmGpuLayers:
-          (json['llmGpuLayers'] as num?)?.toInt() ?? defaults.llmGpuLayers,
-      llmMaxTokens:
-          (json['llmMaxTokens'] as num?)?.toInt() ?? defaults.llmMaxTokens,
-      llmTemperature: (json['llmTemperature'] as num?)?.toDouble() ??
-          defaults.llmTemperature,
-      systemPrompt: json['systemPrompt'] as String? ?? defaults.systemPrompt,
-      sttLanguage: json['sttLanguage'] as String? ?? defaults.sttLanguage,
-      sttVad: json['sttVad'] as bool? ?? defaults.sttVad,
-      sttSilenceTimeoutMs: (json['sttSilenceTimeoutMs'] as num?)?.toInt() ??
-          defaults.sttSilenceTimeoutMs,
+      themeMode: j['themeMode'] as String? ?? d.themeMode,
+      serverPort: (j['serverPort'] as num?)?.toInt() ?? d.serverPort,
+      requireApiKey: j['requireApiKey'] as bool? ?? d.requireApiKey,
+      apiKey: j['apiKey'] as String? ?? d.apiKey,
+      autoStartServer: j['autoStartServer'] as bool? ?? d.autoStartServer,
+      lanAccess: j['lanAccess'] as bool? ?? d.lanAccess,
+      cors: j['cors'] as bool? ?? d.cors,
+      llmContextSize: (j['llmContextSize'] as num?)?.toInt() ?? d.llmContextSize,
+      llmThreads: (j['llmThreads'] as num?)?.toInt() ?? d.llmThreads,
+      llmGpuLayers: (j['llmGpuLayers'] as num?)?.toInt() ?? d.llmGpuLayers,
+      llmMaxTokens: (j['llmMaxTokens'] as num?)?.toInt() ?? d.llmMaxTokens,
+      llmTemperature:
+          (j['llmTemperature'] as num?)?.toDouble() ?? d.llmTemperature,
+      systemPrompt: j['systemPrompt'] as String? ?? d.systemPrompt,
+      sttLanguage: j['sttLanguage'] as String? ?? d.sttLanguage,
+      sttVad: j['sttVad'] as bool? ?? d.sttVad,
+      sttSilenceTimeoutMs:
+          (j['sttSilenceTimeoutMs'] as num?)?.toInt() ?? d.sttSilenceTimeoutMs,
       sttConfidenceThreshold:
-          (json['sttConfidenceThreshold'] as num?)?.toDouble() ??
-              defaults.sttConfidenceThreshold,
-      ttsVoice: json['ttsVoice'] as String? ?? defaults.ttsVoice,
-      ttsSpeed: (json['ttsSpeed'] as num?)?.toDouble() ?? defaults.ttsSpeed,
-      ttsAudioFormat:
-          json['ttsAudioFormat'] as String? ?? defaults.ttsAudioFormat,
+          (j['sttConfidenceThreshold'] as num?)?.toDouble() ??
+              d.sttConfidenceThreshold,
+      ttsVoice: j['ttsVoice'] as String? ?? d.ttsVoice,
+      ttsSpeed: (j['ttsSpeed'] as num?)?.toDouble() ?? d.ttsSpeed,
+      ttsAudioFormat: j['ttsAudioFormat'] as String? ?? d.ttsAudioFormat,
       ttsStreamingBufferMs:
-          (json['ttsStreamingBufferMs'] as num?)?.toInt() ??
-              defaults.ttsStreamingBufferMs,
+          (j['ttsStreamingBufferMs'] as num?)?.toInt() ?? d.ttsStreamingBufferMs,
       ttsSentenceChunking:
-          json['ttsSentenceChunking'] as bool? ?? defaults.ttsSentenceChunking,
-      imageSize: json['imageSize'] as String? ?? defaults.imageSize,
-      imageSteps:
-          (json['imageSteps'] as num?)?.toInt() ?? defaults.imageSteps,
-      imageCfg: (json['imageCfg'] as num?)?.toDouble() ?? defaults.imageCfg,
-      imageSampler: json['imageSampler'] as String? ?? defaults.imageSampler,
-      imageScheduler:
-          json['imageScheduler'] as String? ?? defaults.imageScheduler,
+          j['ttsSentenceChunking'] as bool? ?? d.ttsSentenceChunking,
+      imageSize: j['imageSize'] as String? ?? d.imageSize,
+      imageSteps: (j['imageSteps'] as num?)?.toInt() ?? d.imageSteps,
+      imageCfg: (j['imageCfg'] as num?)?.toDouble() ?? d.imageCfg,
+      imageSampler: j['imageSampler'] as String? ?? d.imageSampler,
+      imageScheduler: j['imageScheduler'] as String? ?? d.imageScheduler,
     );
   }
 }
@@ -216,8 +204,7 @@ class SettingsService {
   static const _key = 'eburon_hub_settings_v1';
 
   Future<AppSettings> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
+    final raw = (await SharedPreferences.getInstance()).getString(_key);
     if (raw == null) return const AppSettings();
     try {
       return AppSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -227,8 +214,8 @@ class SettingsService {
   }
 
   Future<void> save(AppSettings settings) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(settings.toJson()));
+    await (await SharedPreferences.getInstance())
+        .setString(_key, jsonEncode(settings.toJson()));
   }
 }
 
@@ -236,27 +223,24 @@ class ModelStore {
   static const _key = 'eburon_hub_models_v1';
 
   Future<List<ModelDescriptor>> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
+    final raw = (await SharedPreferences.getInstance()).getString(_key);
     if (raw == null) return const [];
     try {
-      final decoded = jsonDecode(raw) as List<dynamic>;
-      return decoded
+      return (jsonDecode(raw) as List<dynamic>)
           .map((e) => ModelDescriptor.fromJson(
                 Map<String, Object?>.from(e as Map<dynamic, dynamic>),
               ))
-          .map((model) => model.copyWith(loaded: false))
-          .toList();
+          .map((e) => e.copyWith(loaded: false))
+          .toList(growable: false);
     } catch (_) {
       return const [];
     }
   }
 
   Future<void> save(List<ModelDescriptor> models) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    await (await SharedPreferences.getInstance()).setString(
       _key,
-      jsonEncode(models.map((e) => e.toJson()).toList()),
+      jsonEncode(models.map((e) => e.toJson()).toList(growable: false)),
     );
   }
 }
@@ -267,11 +251,10 @@ class ModelImporter {
   final Uuid _uuid;
 
   Future<ModelDescriptor?> pickAndImport({ModelType? expectedType}) async {
-    final result = await FilePicker.platform.pickFiles(
+    final picked = await FilePicker.platform.pickFiles(
       allowMultiple: false,
-      withData: false,
       type: FileType.custom,
-      allowedExtensions: [
+      allowedExtensions: const [
         'gguf',
         'bin',
         'safetensors',
@@ -280,8 +263,9 @@ class ModelImporter {
         'eburonmodel',
       ],
     );
-    if (result == null || result.files.single.path == null) return null;
-    return importPath(result.files.single.path!, expectedType: expectedType);
+    final path = picked?.files.single.path;
+    if (path == null) return null;
+    return importPath(path, expectedType: expectedType);
   }
 
   Future<ModelDescriptor> importPath(
@@ -292,62 +276,56 @@ class ModelImporter {
     if (!await source.exists()) {
       throw FileSystemException('Model file not found', sourcePath);
     }
-
     final lower = sourcePath.toLowerCase();
     if (lower.endsWith('.eburonmodel') || lower.endsWith('.zip')) {
-      return _importPackage(source, expectedType: expectedType);
+      return _importPackage(source, expectedType);
     }
-    return _importSingleFile(source, expectedType: expectedType);
+    return _importSingleFile(source, expectedType);
   }
 
   Future<ModelDescriptor> _importSingleFile(
-    File source, {
+    File source,
     ModelType? expectedType,
-  }) async {
-    final ext = p.extension(source.path).toLowerCase();
+  ) async {
     final fileName = p.basename(source.path);
+    final ext = p.extension(fileName).toLowerCase();
+
     late final ModelType type;
     late final RuntimeKind runtime;
     late final ModelFormat format;
     late final String architecture;
 
-    switch (ext) {
-      case '.gguf':
-        type = expectedType ?? ModelType.llm;
-        if (type == ModelType.image) {
-          runtime = RuntimeKind.stableDiffusionCpp;
-          architecture = 'diffusion';
-        } else if (type == ModelType.llm) {
-          runtime = RuntimeKind.llamaCpp;
-          architecture = _guessLlmArchitecture(fileName);
-        } else {
-          throw FormatException(
-            'Raw GGUF is supported for LLM or image models; use an .eburonmodel package for $type.',
-          );
-        }
-        format = ModelFormat.gguf;
-      case '.safetensors':
-        type = ModelType.image;
+    if (ext == '.gguf') {
+      type = expectedType ?? ModelType.llm;
+      if (type == ModelType.llm) {
+        runtime = RuntimeKind.llamaCpp;
+        architecture = _guessLlmArchitecture(fileName);
+      } else if (type == ModelType.image) {
         runtime = RuntimeKind.stableDiffusionCpp;
-        format = ModelFormat.safetensors;
         architecture = _guessImageArchitecture(fileName);
-      case '.ckpt':
-        type = ModelType.image;
-        runtime = RuntimeKind.stableDiffusionCpp;
-        format = ModelFormat.ckpt;
-        architecture = _guessImageArchitecture(fileName);
-      case '.bin':
-        if (!fileName.toLowerCase().startsWith('ggml-')) {
-          throw const FormatException(
-            'Raw .bin imports are reserved for whisper.cpp ggml-*.bin models.',
-          );
-        }
-        type = ModelType.stt;
-        runtime = RuntimeKind.whisperCpp;
-        format = ModelFormat.ggmlBin;
-        architecture = 'whisper';
-      default:
-        throw FormatException('Unsupported model file: $fileName');
+      } else {
+        throw FormatException(
+          'Raw GGUF is valid only for LLM or image slots; package $type as .eburonmodel.',
+        );
+      }
+      format = ModelFormat.gguf;
+    } else if (ext == '.safetensors') {
+      type = ModelType.image;
+      runtime = RuntimeKind.stableDiffusionCpp;
+      format = ModelFormat.safetensors;
+      architecture = _guessImageArchitecture(fileName);
+    } else if (ext == '.ckpt') {
+      type = ModelType.image;
+      runtime = RuntimeKind.stableDiffusionCpp;
+      format = ModelFormat.ckpt;
+      architecture = _guessImageArchitecture(fileName);
+    } else if (ext == '.bin' && fileName.toLowerCase().startsWith('ggml-')) {
+      type = ModelType.stt;
+      runtime = RuntimeKind.whisperCpp;
+      format = ModelFormat.ggmlBin;
+      architecture = 'whisper';
+    } else {
+      throw FormatException('Unsupported model file: $fileName');
     }
 
     if (expectedType != null && expectedType != type) {
@@ -356,15 +334,10 @@ class ModelImporter {
       );
     }
 
-    final root = await _modelRoot();
     final id = _uuid.v4();
-    final destinationDir = Directory(p.join(root.path, id));
-    await destinationDir.create(recursive: true);
-    final destination = File(p.join(destinationDir.path, fileName));
-    await source.copy(destination.path);
-    final size = await destination.length();
-    final checksum = await _sha256File(destination);
-
+    final dir = Directory(p.join((await _modelRoot()).path, id));
+    await dir.create(recursive: true);
+    final out = await source.copy(p.join(dir.path, fileName));
     return ModelDescriptor(
       id: id,
       name: p.basenameWithoutExtension(fileName),
@@ -372,123 +345,123 @@ class ModelImporter {
       runtime: runtime,
       architecture: architecture,
       format: format,
-      sizeBytes: size,
-      path: destination.path,
+      sizeBytes: await out.length(),
+      path: out.path,
       quantization: _guessQuantization(fileName),
       capabilities: _defaultCapabilities(type),
-      checksum: checksum,
+      checksum: await _sha256File(out),
     );
   }
 
   Future<ModelDescriptor> _importPackage(
-    File source, {
+    File source,
     ModelType? expectedType,
-  }) async {
-    final bytes = await source.readAsBytes();
-    final archive = ZipDecoder().decodeBytes(bytes, verify: true);
-    final manifestEntry = archive.findFile('manifest.json');
-    if (manifestEntry == null || !manifestEntry.isFile) {
-      throw const FormatException('Package is missing manifest.json');
-    }
-
-    final manifest = jsonDecode(utf8.decode(manifestEntry.content))
-        as Map<String, dynamic>;
-    final schema = (manifest['schema'] as num?)?.toInt();
-    if (schema != 1) {
-      throw FormatException('Unsupported .eburonmodel schema: $schema');
-    }
-
-    final type = ModelTypeWire.fromWire(manifest['type'] as String? ?? '');
-    final runtime =
-        RuntimeKindWire.fromWire(manifest['runtime'] as String? ?? '');
-    if (runtime == RuntimeKind.unknown) {
-      throw FormatException('Unsupported runtime: ${manifest['runtime']}');
-    }
-    if (expectedType != null && expectedType != type) {
-      throw FormatException(
-        'Selected ${expectedType.wireName} slot cannot import ${type.wireName} package.',
-      );
-    }
-
-    final declaredFiles = _declaredFiles(manifest['files']);
-    if (declaredFiles.isEmpty) {
-      throw const FormatException('manifest.files must declare model dependencies');
-    }
-    for (final file in declaredFiles.values) {
-      if (archive.findFile(file.path) == null) {
-        throw FormatException('Missing package dependency: ${file.path}');
+  ) async {
+    final input = InputFileStream(source.path);
+    final archive = ZipDecoder().decodeStream(input, verify: true);
+    try {
+      final manifestEntry = archive.findFile('manifest.json');
+      if (manifestEntry == null || !manifestEntry.isFile) {
+        throw const FormatException('Package is missing manifest.json');
       }
-    }
-
-    final id = manifest['id'] as String? ?? _uuid.v4();
-    final root = await _modelRoot();
-    final destinationDir = Directory(p.join(root.path, _safeId(id)));
-    if (await destinationDir.exists()) {
-      await destinationDir.delete(recursive: true);
-    }
-    await destinationDir.create(recursive: true);
-
-    int totalBytes = 0;
-    for (final entry in archive) {
-      if (!entry.isFile) continue;
-      if (entry.symbolicLink != null) {
-        throw FormatException('Symlinks are not allowed: ${entry.name}');
+      final manifest = jsonDecode(utf8.decode(manifestEntry.content))
+          as Map<String, dynamic>;
+      if ((manifest['schema'] as num?)?.toInt() != 1) {
+        throw FormatException(
+          'Unsupported .eburonmodel schema: ${manifest['schema']}',
+        );
       }
-      final safeRelative = _safeArchivePath(entry.name);
-      final output = File(p.join(destinationDir.path, safeRelative));
-      await output.parent.create(recursive: true);
-      await output.writeAsBytes(entry.content, flush: true);
-      totalBytes += entry.size;
-    }
 
-    for (final file in declaredFiles.values) {
-      if (file.sha256 == null || file.sha256!.isEmpty) continue;
-      final actual = await _sha256File(File(p.join(destinationDir.path, file.path)));
-      if (actual.toLowerCase() != file.sha256!.toLowerCase()) {
-        await destinationDir.delete(recursive: true);
-        throw FormatException('Checksum mismatch: ${file.path}');
+      final type = ModelTypeWire.fromWire(manifest['type']?.toString() ?? '');
+      final runtime =
+          RuntimeKindWire.fromWire(manifest['runtime']?.toString() ?? '');
+      if (runtime == RuntimeKind.unknown) {
+        throw FormatException('Unsupported runtime: ${manifest['runtime']}');
       }
-    }
+      if (expectedType != null && expectedType != type) {
+        throw FormatException(
+          'Selected ${expectedType.wireName} slot cannot import ${type.wireName} package.',
+        );
+      }
 
-    final languages = (manifest['languages'] as List<dynamic>? ?? const [])
-        .map((e) => e.toString())
-        .toList(growable: false);
-    final capabilities =
-        (manifest['capabilities'] as List<dynamic>? ?? _defaultCapabilities(type))
+      final declared = _declaredFiles(manifest['files']);
+      if (declared.isEmpty) {
+        throw const FormatException('manifest.files cannot be empty');
+      }
+      for (final item in declared.values) {
+        if (archive.findFile(item.path) == null) {
+          throw FormatException('Missing package dependency: ${item.path}');
+        }
+      }
+
+      final id = manifest['id']?.toString() ?? _uuid.v4();
+      final dir = Directory(p.join((await _modelRoot()).path, _safeId(id)));
+      if (await dir.exists()) await dir.delete(recursive: true);
+      await dir.create(recursive: true);
+
+      int totalBytes = 0;
+      for (final entry in archive) {
+        if (!entry.isFile) continue;
+        if (entry.symbolicLink != null) {
+          throw FormatException('Symlinks are not allowed: ${entry.name}');
+        }
+        final relative = _safeArchivePath(entry.name);
+        final output = File(p.join(dir.path, relative));
+        await output.parent.create(recursive: true);
+        await output.writeAsBytes(entry.content, flush: true);
+        totalBytes += entry.size;
+      }
+
+      for (final item in declared.values) {
+        if (item.sha256 == null || item.sha256!.isEmpty) continue;
+        final actual = await _sha256File(File(p.join(dir.path, item.path)));
+        if (actual.toLowerCase() != item.sha256!.toLowerCase()) {
+          await dir.delete(recursive: true);
+          throw FormatException('Checksum mismatch: ${item.path}');
+        }
+      }
+
+      return ModelDescriptor(
+        id: id,
+        name: manifest['name']?.toString() ?? id,
+        type: type,
+        runtime: runtime,
+        architecture: manifest['architecture']?.toString() ?? 'unknown',
+        format: ModelFormat.eburonModel,
+        sizeBytes: totalBytes,
+        languages: (manifest['languages'] as List<dynamic>? ?? const [])
             .map((e) => e.toString())
-            .toList(growable: false);
-
-    return ModelDescriptor(
-      id: id,
-      name: manifest['name'] as String? ?? id,
-      type: type,
-      runtime: runtime,
-      architecture: manifest['architecture'] as String? ?? 'unknown',
-      format: ModelFormat.eburonModel,
-      sizeBytes: totalBytes,
-      languages: languages,
-      quantization: manifest['quantization'] as String?,
-      capabilities: capabilities,
-      path: destinationDir.path,
-      version: manifest['version'] as String?,
-      metadata: Map<String, Object?>.from(manifest),
-    );
+            .toList(growable: false),
+        quantization: manifest['quantization']?.toString(),
+        capabilities:
+            (manifest['capabilities'] as List<dynamic>? ?? _defaultCapabilities(type))
+                .map((e) => e.toString())
+                .toList(growable: false),
+        path: dir.path,
+        version: manifest['version']?.toString(),
+        metadata: Map<String, Object?>.from(manifest),
+      );
+    } finally {
+      input.closeSync();
+      archive.clearSync();
+    }
   }
 
-  Map<String, _DeclaredFile> _declaredFiles(Object? rawFiles) {
-    if (rawFiles is! Map) return const {};
+  Map<String, _DeclaredFile> _declaredFiles(Object? raw) {
+    if (raw is! Map) return const {};
     final result = <String, _DeclaredFile>{};
-    for (final entry in rawFiles.entries) {
+    for (final entry in raw.entries) {
       final value = entry.value;
       if (value is String) {
         result[entry.key.toString()] = _DeclaredFile(_safeArchivePath(value));
       } else if (value is Map) {
-        final pathValue = value['path']?.toString();
-        if (pathValue == null) continue;
-        result[entry.key.toString()] = _DeclaredFile(
-          _safeArchivePath(pathValue),
-          sha256: value['sha256']?.toString(),
-        );
+        final filePath = value['path']?.toString();
+        if (filePath != null) {
+          result[entry.key.toString()] = _DeclaredFile(
+            _safeArchivePath(filePath),
+            sha256: value['sha256']?.toString(),
+          );
+        }
       }
     }
     return result;
@@ -498,7 +471,8 @@ class ModelImporter {
     final normalized = p.posix.normalize(raw.replaceAll('\\', '/'));
     if (normalized.startsWith('/') ||
         normalized == '..' ||
-        normalized.startsWith('../')) {
+        normalized.startsWith('../') ||
+        p.posix.isAbsolute(normalized)) {
       throw FormatException('Unsafe package path: $raw');
     }
     return normalized;
@@ -513,10 +487,8 @@ class ModelImporter {
     return root;
   }
 
-  Future<String> _sha256File(File file) async {
-    final digest = await sha256.bind(file.openRead()).first;
-    return digest.toString();
-  }
+  Future<String> _sha256File(File file) async =>
+      (await sha256.bind(file.openRead()).first).toString();
 
   String _guessLlmArchitecture(String name) {
     final n = name.toLowerCase();
@@ -536,17 +508,16 @@ class ModelImporter {
     return 'stable-diffusion';
   }
 
-  String? _guessQuantization(String name) {
-    final match = RegExp(r'(Q\d(?:_[A-Z0-9]+)?|IQ\d_[A-Z0-9]+)', caseSensitive: false)
-        .firstMatch(name);
-    return match?.group(1)?.toUpperCase();
-  }
+  String? _guessQuantization(String name) => RegExp(
+        r'(Q\d(?:_[A-Z0-9]+)?|IQ\d_[A-Z0-9]+)',
+        caseSensitive: false,
+      ).firstMatch(name)?.group(1)?.toUpperCase();
 
   List<String> _defaultCapabilities(ModelType type) => switch (type) {
         ModelType.llm => const ['chat', 'completion', 'streaming'],
-        ModelType.stt => const ['transcription'],
-        ModelType.tts => const ['speech'],
-        ModelType.image => const ['txt2img'],
+        ModelType.stt => const ['transcription', 'streaming'],
+        ModelType.tts => const ['speech', 'streaming'],
+        ModelType.image => const ['txt2img', 'img2img'],
       };
 }
 
