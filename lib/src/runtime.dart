@@ -63,13 +63,14 @@ abstract class ImageGenerationEngine {
 
 class CancellationToken {
   bool _cancelled = false;
+  bool _disposed = false;
   final StreamController<void> _controller = StreamController<void>.broadcast();
 
   bool get isCancelled => _cancelled;
   Stream<void> get onCancel => _controller.stream;
 
   void cancel() {
-    if (_cancelled) return;
+    if (_cancelled || _disposed) return;
     _cancelled = true;
     _controller.add(null);
   }
@@ -78,7 +79,11 @@ class CancellationToken {
     if (_cancelled) throw const InferenceCancelledException();
   }
 
-  Future<void> dispose() => _controller.close();
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    await _controller.close();
+  }
 }
 
 class InferenceCancelledException implements Exception {
@@ -127,12 +132,14 @@ class InferenceScheduler {
   String? get activeRequestId => _activeRequestId;
 
   List<InferenceQueueEntry> get queued => _queue
-      .map((e) => InferenceQueueEntry(
-            id: e.id,
-            priority: e.priority,
-            createdAt: e.createdAt,
-            label: e.label,
-          ))
+      .map(
+        (e) => InferenceQueueEntry(
+          id: e.id,
+          priority: e.priority,
+          createdAt: e.createdAt,
+          label: e.label,
+        ),
+      )
       .toList(growable: false);
 
   Future<T> schedule<T>({
@@ -142,6 +149,10 @@ class InferenceScheduler {
     required Future<T> Function(CancellationToken token) task,
     Duration? timeout,
   }) {
+    if (_tokens.containsKey(id)) {
+      throw StateError('Duplicate inference request id: $id');
+    }
+
     final token = CancellationToken();
     final completer = Completer<T>();
     _tokens[id] = token;
@@ -152,6 +163,12 @@ class InferenceScheduler {
         label: label,
         priority: priority,
         createdAt: DateTime.now(),
+        cancelQueued: () {
+          token.cancel();
+          if (!completer.isCompleted) {
+            completer.completeError(const InferenceCancelledException());
+          }
+        },
         run: () async {
           try {
             token.throwIfCancelled();
@@ -180,7 +197,8 @@ class InferenceScheduler {
     if (index >= 0) {
       final task = _queue.removeAt(index);
       task.cancelQueued();
-      _tokens.remove(requestId)?.dispose();
+      final token = _tokens.remove(requestId);
+      if (token != null) unawaited(token.dispose());
       _emitQueue();
     }
   }
@@ -212,10 +230,16 @@ class InferenceScheduler {
     }
   }
 
-  void _emitQueue() => _queueController.add(queued);
+  void _emitQueue() {
+    if (!_queueController.isClosed) _queueController.add(queued);
+  }
 
   Future<void> dispose() async {
-    for (final token in _tokens.values) {
+    for (final task in List<_ScheduledTask>.from(_queue)) {
+      task.cancelQueued();
+    }
+    _queue.clear();
+    for (final token in List<CancellationToken>.from(_tokens.values)) {
       token.cancel();
       await token.dispose();
     }
@@ -231,6 +255,7 @@ class _ScheduledTask {
     required this.priority,
     required this.createdAt,
     required this.run,
+    required this.cancelQueued,
   });
 
   final String id;
@@ -238,8 +263,7 @@ class _ScheduledTask {
   final InferencePriority priority;
   final DateTime createdAt;
   final Future<void> Function() run;
-
-  void cancelQueued() {}
+  final void Function() cancelQueued;
 }
 
 class RuntimeResourceEntry {
@@ -349,16 +373,25 @@ class NativeRuntimeBridge {
   static NativeRuntimeBridge open() {
     try {
       if (Platform.isAndroid) {
-        return NativeRuntimeBridge._(DynamicLibrary.open('libeburon_runtime.so'), null);
+        return NativeRuntimeBridge._(
+          DynamicLibrary.open('libeburon_runtime.so'),
+          null,
+        );
       }
       if (Platform.isIOS || Platform.isMacOS) {
         return NativeRuntimeBridge._(DynamicLibrary.process(), null);
       }
       if (Platform.isLinux) {
-        return NativeRuntimeBridge._(DynamicLibrary.open('libeburon_runtime.so'), null);
+        return NativeRuntimeBridge._(
+          DynamicLibrary.open('libeburon_runtime.so'),
+          null,
+        );
       }
       if (Platform.isWindows) {
-        return NativeRuntimeBridge._(DynamicLibrary.open('eburon_runtime.dll'), null);
+        return NativeRuntimeBridge._(
+          DynamicLibrary.open('eburon_runtime.dll'),
+          null,
+        );
       }
       return NativeRuntimeBridge._(null, 'Unsupported platform');
     } catch (error) {
